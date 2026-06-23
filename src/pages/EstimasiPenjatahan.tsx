@@ -1,47 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Card from '../components/Card';
+import IpoSelect from '../components/IpoSelect';
 import { hitungPenjatahan } from '../utils/calculations';
 import { formatRupiah, formatNumber, formatDecimal } from '../utils/format';
 import { exportPenjatahanPdf } from '../utils/exportPdf';
 import { exportPenjatahanExcel } from '../utils/exportExcel';
 import { addHistory } from '../services/storage';
 import { useToast } from '../context/ToastContext';
-import type { PenjatahanInput, PenjatahanResult } from '../types';
+import type { PenjatahanInput, PenjatahanResult, IpoData } from '../types';
 import { Calculator, FileDown, FileSpreadsheet, Copy, RotateCcw } from 'lucide-react';
+import { fetchIpoById } from '../services/ipoService';
 
-const initialInput: PenjatahanInput = {
-  ticker: '',
-  totalDana: 0,
-  hargaIPO: 0,
-  oversubscribeLot: 0,
-  antrianInvestor: 0,
-  humanError: 0,
-};
+const initial: PenjatahanInput = { ticker: '', totalDana: 0, hargaIPO: 0, oversubscribeLot: 0, antrianInvestor: 0 };
 
 export default function EstimasiPenjatahan() {
-  const [input, setInput] = useState<PenjatahanInput>(initialInput);
+  const [searchParams] = useSearchParams();
+  const [input, setInput] = useState<PenjatahanInput>(initial);
   const [result, setResult] = useState<PenjatahanResult | null>(null);
+  const [selectedIpo, setSelectedIpo] = useState<IpoData | null>(null);
   const { addToast } = useToast();
 
-  const handleChange = (field: keyof PenjatahanInput, value: string) => {
-    const num = value === '' ? 0 : Number(value.replace(/\./g, '').replace(/,/g, ''));
-    setInput((prev) => ({ ...prev, [field]: field === 'ticker' ? value : (isNaN(num) ? 0 : num) }));
+  useEffect(() => {
+    const ipoId = searchParams.get('ipo');
+    if (ipoId) { fetchIpoById(ipoId).then((d) => { if (d) { setSelectedIpo(d); setInput((p) => ({ ...p, ticker: d.ticker, totalDana: d.fundraising, hargaIPO: d.ipoPrice })); } }); }
+  }, [searchParams]);
+
+  const handleIpoSelect = (ipo: IpoData | null) => {
+    setSelectedIpo(ipo);
+    if (ipo) { setInput((p) => ({ ...p, ticker: ipo.ticker, totalDana: ipo.fundraising, hargaIPO: ipo.ipoPrice })); }
+    else { setInput((p) => ({ ...p, ticker: '', totalDana: 0, hargaIPO: 0 })); }
+    setResult(null);
+  };
+
+  const setNum = (field: keyof PenjatahanInput, val: string) => {
+    const n = Number(val.replace(/\./g, '').replace(/,/g, ''));
+    setInput((p) => ({ ...p, [field]: field === 'ticker' ? val : (isNaN(n) ? 0 : n) }));
   };
 
   const handleHitung = () => {
-    if (!input.ticker || input.totalDana <= 0 || input.hargaIPO <= 0 || input.antrianInvestor <= 0) {
-      addToast('Lengkapi semua input yang diperlukan', 'error');
-      return;
-    }
-    const res = hitungPenjatahan(input);
-    setResult(res);
-    addHistory('penjatahan', `${input.ticker}: Estimasi ${res.estimasiBulat} lot`);
+    if (!input.ticker || input.totalDana <= 0 || input.hargaIPO <= 0 || input.antrianInvestor <= 0) { addToast('Lengkapi semua input', 'error'); return; }
+    const r = hitungPenjatahan(input);
+    setResult(r);
+    addHistory('penjatahan', `${input.ticker}: Estimasi ${r.estimasiBulat} lot`);
     addToast('Perhitungan berhasil!');
-  };
-
-  const handleReset = () => {
-    setInput(initialInput);
-    setResult(null);
   };
 
   const getRows = (): { label: string; value: string }[] => {
@@ -55,152 +57,55 @@ export default function EstimasiPenjatahan() {
       { label: 'Porsi Pooling', value: formatRupiah(result.porsiPooling) },
       { label: 'Pooling Ritel', value: formatRupiah(result.poolingRitel) },
       { label: 'Pooling Bukan Ritel', value: formatRupiah(result.poolingBukanRitel) },
-      { label: 'Estimasi Penjatahan', value: formatDecimal(result.estimasi, 4) },
+      { label: 'Human Error', value: '20%' },
+      { label: 'Faktor Koreksi', value: '1,25' },
+      { label: 'Estimasi Penjatahan', value: formatDecimal(result.estimasi, 2) + ' lot' },
       { label: 'Estimasi Penjatahan Bulat', value: formatNumber(result.estimasiBulat) + ' lot' },
     ];
   };
 
-  const handleCopy = () => {
-    const text = getRows().map((r) => `${r.label}: ${r.value}`).join('\n');
-    navigator.clipboard.writeText(text);
-    addToast('Berhasil disalin ke clipboard!');
-  };
-
-  const handlePdf = () => {
-    exportPenjatahanPdf(input.ticker, getRows());
-    addToast('Berhasil export ke PDF!');
-  };
-
-  const handleExcel = () => {
-    exportPenjatahanExcel(input.ticker, getRows());
-    addToast('Berhasil export ke Excel!');
-  };
+  const handleCopy = () => { navigator.clipboard.writeText(getRows().map((r) => `${r.label}: ${r.value}`).join('\n')); addToast('Disalin ke clipboard!'); };
+  const handlePdf = () => { exportPenjatahanPdf(input.ticker, getRows()); addToast('Export PDF berhasil!'); };
+  const handleExcel = () => { exportPenjatahanExcel(input.ticker, getRows()); addToast('Export Excel berhasil!'); };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Estimasi Penjatahan IPO</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Mengestimasi jumlah lot yang kemungkinan diperoleh investor saat IPO
-        </p>
-      </div>
+    <div className="max-w-3xl mx-auto space-y-4 pb-6 anim-fade-up">
+      <div><h1 className="text-xl font-extrabold text-slate-900 dark:text-white">Estimasi Penjatahan IPO</h1><p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Human Error otomatis 20%, Faktor Koreksi 1,25</p></div>
 
       <Card>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <InputField
-            label="Ticker Saham"
-            value={input.ticker}
-            onChange={(v) => handleChange('ticker', v)}
-            placeholder="Contoh: PRDI"
-          />
-          <InputField
-            label="Total Dana Dihimpun (Rp)"
-            value={input.totalDana > 0 ? input.totalDana.toLocaleString('id-ID') : ''}
-            onChange={(v) => handleChange('totalDana', v)}
-            placeholder="Contoh: 5000000000"
-          />
-          <InputField
-            label="Harga IPO per Lembar (Rp)"
-            value={input.hargaIPO > 0 ? input.hargaIPO.toLocaleString('id-ID') : ''}
-            onChange={(v) => handleChange('hargaIPO', v)}
-            placeholder="Contoh: 120"
-          />
-          <InputField
-            label="Oversubscribe Lot"
-            value={input.oversubscribeLot > 0 ? input.oversubscribeLot.toLocaleString('id-ID') : ''}
-            onChange={(v) => handleChange('oversubscribeLot', v)}
-            placeholder="Contoh: 50000"
-          />
-          <InputField
-            label="Asumsi Antrian Investor"
-            value={input.antrianInvestor > 0 ? input.antrianInvestor.toLocaleString('id-ID') : ''}
-            onChange={(v) => handleChange('antrianInvestor', v)}
-            placeholder="Contoh: 10000"
-          />
-          <InputField
-            label="Human Error (%)"
-            value={input.humanError > 0 ? input.humanError.toString() : ''}
-            onChange={(v) => handleChange('humanError', v)}
-            placeholder="Contoh: 5"
-          />
+        <div className="space-y-3">
+          <div><label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Pilih IPO</label><IpoSelect value={selectedIpo?.id || ''} onChange={handleIpoSelect} /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Inp label="Ticker Saham" value={input.ticker} onChange={(v) => setNum('ticker', v)} placeholder="PRDI" />
+            <Inp label="Total Dana Dihimpun (Rp)" value={input.totalDana > 0 ? input.totalDana.toLocaleString('id-ID') : ''} onChange={(v) => setNum('totalDana', v)} placeholder="5000000000" />
+            <Inp label="Harga IPO per Lembar (Rp)" value={input.hargaIPO > 0 ? input.hargaIPO.toLocaleString('id-ID') : ''} onChange={(v) => setNum('hargaIPO', v)} placeholder="120" />
+            <Inp label="Oversubscribe Lot" value={input.oversubscribeLot > 0 ? input.oversubscribeLot.toLocaleString('id-ID') : ''} onChange={(v) => setNum('oversubscribeLot', v)} placeholder="50000" />
+            <Inp label="Asumsi Antrian Investor" value={input.antrianInvestor > 0 ? input.antrianInvestor.toLocaleString('id-ID') : ''} onChange={(v) => setNum('antrianInvestor', v)} placeholder="10000" />
+          </div>
         </div>
-
-        <div className="flex flex-wrap gap-2 mt-6">
-          <button
-            onClick={handleHitung}
-            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl transition-colors"
-          >
-            <Calculator className="w-4 h-4" />
-            Hitung
-          </button>
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-xl transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Reset
-          </button>
+        <div className="flex gap-2 mt-5">
+          <button onClick={handleHitung} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-emerald-500/20"><Calculator className="w-4 h-4" />Hitung</button>
+          <button onClick={() => { setInput(initial); setSelectedIpo(null); setResult(null); }} className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-sm font-medium rounded-xl transition-colors"><RotateCcw className="w-4 h-4" />Reset</button>
         </div>
       </Card>
 
       {result && (
-        <Card className="animate-fade-in">
+        <Card className="anim-fade-up">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Hasil — {input.ticker}
-            </h2>
-            <div className="flex gap-1.5">
-              <button onClick={handleCopy} title="Copy" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors">
-                <Copy className="w-4 h-4" />
-              </button>
-              <button onClick={handlePdf} title="Export PDF" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors">
-                <FileDown className="w-4 h-4" />
-              </button>
-              <button onClick={handleExcel} title="Export Excel" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors">
-                <FileSpreadsheet className="w-4 h-4" />
-              </button>
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white">Hasil — {input.ticker}</h2>
+            <div className="flex gap-1">
+              {[handleCopy, handlePdf, handleExcel].map((fn, i) => (
+                <button key={i} onClick={fn} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors">{[Copy, FileDown, FileSpreadsheet][i] && <>{[Copy, FileDown, FileSpreadsheet].map((Icon, j) => j === i && <Icon key={j} className="w-4 h-4" />)}</>}</button>
+              ))}
             </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {getRows().map((row) => (
-              <div
-                key={row.label}
-                className={`p-4 rounded-xl border border-gray-100 dark:border-gray-800 ${
-                  row.label === 'Estimasi Penjatahan Bulat'
-                    ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20'
-                    : 'bg-gray-50 dark:bg-gray-800/50'
-                }`}
-              >
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{row.label}</p>
-                <p className={`text-lg font-bold ${
-                  row.label === 'Estimasi Penjatahan Bulat'
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-gray-900 dark:text-white'
-                }`}>
-                  {row.value}
-                </p>
+              <div key={row.label} className={`p-3.5 rounded-xl border ${row.label.includes('Bulat') ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' : 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800'}`}>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{row.label}</p>
+                <p className={`text-base font-bold mt-0.5 ${row.label.includes('Bulat') ? 'text-emerald-600 dark:text-emerald-400 text-lg' : 'text-slate-900 dark:text-white'}`}>{row.value}</p>
               </div>
             ))}
-          </div>
-
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Komponen</th>
-                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nilai</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getRows().map((row, i) => (
-                  <tr key={row.label} className={i % 2 === 0 ? 'bg-gray-50/50 dark:bg-gray-800/30' : ''}>
-                    <td className="py-2.5 px-4 text-gray-700 dark:text-gray-300">{row.label}</td>
-                    <td className="py-2.5 px-4 text-right font-medium text-gray-900 dark:text-white">{row.value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </Card>
       )}
@@ -208,18 +113,11 @@ export default function EstimasiPenjatahan() {
   );
 }
 
-function InputField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+function Inp({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">{label}</label>
-      <input
-        type="text"
-        inputMode={label.includes('Ticker') ? 'text' : 'numeric'}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
-      />
+      <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">{label}</label>
+      <input type="text" inputMode={label.includes('Ticker') ? 'text' : 'numeric'} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" />
     </div>
   );
 }

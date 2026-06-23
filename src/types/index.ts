@@ -1,10 +1,12 @@
+// Re-export IPO types
+export type { IpoData, IpoFilter } from './ipo';
+
 export interface PenjatahanInput {
   ticker: string;
   totalDana: number;
   hargaIPO: number;
   oversubscribeLot: number;
   antrianInvestor: number;
-  humanError: number;
 }
 
 export interface PenjatahanResult {
@@ -20,14 +22,14 @@ export interface PenjatahanResult {
   estimasiBulat: number;
 }
 
-export interface ARAARBResult {
-  hargaAcuan: number;
-  persentase: number;
-  hargaARA: number;
-  hargaARB: number;
-  simulasiARA: number[];
-  simulasiARB: number[];
+export interface SimulasiHariResult {
+  hari: number;
+  harga: number;
+  persen: number;
+  nilaiPortofolio: number;
 }
+
+export type JenisSaham = 'reguler' | 'fca';
 
 export interface SahamInput {
   id: string;
@@ -48,7 +50,7 @@ export interface SahamResult {
   totalModal: number;
 }
 
-export type HistoryType = 'penjatahan' | 'araarb' | 'modal';
+export type HistoryType = 'penjatahan' | 'araarb' | 'modal' | 'profit';
 
 export interface HistoryItem {
   id: string;

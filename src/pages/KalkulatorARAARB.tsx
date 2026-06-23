@@ -1,234 +1,119 @@
 import { useState } from 'react';
 import Card from '../components/Card';
-import { hitungARAARB } from '../utils/calculations';
+import IpoSelect from '../components/IpoSelect';
+import { getAraPersen, getArbPersen, simulasiARA, simulasiARB } from '../utils/araArbRegular';
+import { simulasiARAFca, simulasiARBFca } from '../utils/araArbFca';
 import { formatRupiah, formatDecimal } from '../utils/format';
 import { exportARAARBPdf } from '../utils/exportPdf';
 import { exportARAARBExcel } from '../utils/exportExcel';
 import { addHistory } from '../services/storage';
 import { useToast } from '../context/ToastContext';
-import type { ARAARBResult } from '../types';
+import type { SimulasiHariResult, JenisSaham, IpoData } from '../types';
 import { Calculator, FileDown, FileSpreadsheet, Copy, RotateCcw, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import clsx from 'clsx';
 
 const fmtAxis = (v: unknown) => Number(v).toLocaleString('id-ID');
-
-const fmtTip = (value: unknown): [string, string] => {
-  const num = Number(value);
-  return [isNaN(num) ? '-' : formatRupiah(num), 'Harga'];
-};
-
-const tooltipStyle = {
-  borderRadius: '12px',
-  border: '1px solid #374151',
-  backgroundColor: '#1f2937',
-  color: '#f3f4f6',
-  fontSize: '12px',
-};
+const fmtTip = (value: unknown): [string, string] => { const n = Number(value); return [isNaN(n) ? '-' : formatRupiah(n), 'Harga']; };
+const tipStyle = { borderRadius: '12px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#f1f5f9', fontSize: '12px' };
 
 export default function KalkulatorARAARB() {
   const [harga, setHarga] = useState('');
-  const [result, setResult] = useState<ARAARBResult | null>(null);
+  const [lot, setLot] = useState('1');
+  const [hari, setHari] = useState('10');
+  const [jenis, setJenis] = useState<JenisSaham>('reguler');
+  const [selectedIpo, setSelectedIpo] = useState<IpoData | null>(null);
+  const [araResult, setAraResult] = useState<SimulasiHariResult[]>([]);
+  const [arbResult, setArbResult] = useState<SimulasiHariResult[]>([]);
   const { addToast } = useToast();
 
+  const handleIpoSelect = (ipo: IpoData | null) => { setSelectedIpo(ipo); if (ipo) setHarga(ipo.ipoPrice.toString()); else setHarga(''); };
+
   const handleHitung = () => {
-    const num = Number(harga.replace(/\./g, '').replace(/,/g, ''));
-    if (isNaN(num) || num <= 0) {
-      addToast('Masukkan harga acuan yang valid', 'error');
-      return;
-    }
-    const res = hitungARAARB(num);
-    setResult(res);
-    addHistory('araarb', `Rp${num.toLocaleString('id-ID')}: ARA ${formatRupiah(res.hargaARA)}, ARB ${formatRupiah(res.hargaARB)}`);
+    const h = Number(harga.replace(/\./g, ''));
+    const l = Number(lot) || 1;
+    const d = Number(hari) || 10;
+    if (isNaN(h) || h <= 0) { addToast('Masukkan harga acuan valid', 'error'); return; }
+
+    const isFca = jenis === 'fca';
+    const ara = isFca ? simulasiARAFca(h, l, d) : simulasiARA(h, l, d);
+    const arb = isFca ? simulasiARBFca(h, l, d) : simulasiARB(h, l, d);
+    setAraResult(ara);
+    setArbResult(arb);
+
+    const persen = isFca ? '35%/25% (FCA)' : `${(getAraPersen(h) * 100).toFixed(0)}%`;
+    addHistory('araarb', `Rp${h.toLocaleString('id-ID')} (${persen}): ARA ${formatRupiah(ara[0]?.harga || 0)}`);
     addToast('Perhitungan berhasil!');
   };
 
-  const handleReset = () => {
-    setHarga('');
-    setResult(null);
-  };
+  const hNum = Number(harga.replace(/\./g, '')) || 0;
+  const persenAra = jenis === 'fca' ? '35% → 25%' : `${(getAraPersen(hNum) * 100).toFixed(0)}%`;
+  const persenArb = jenis === 'fca' ? '35% → 25%' : `${(getArbPersen(hNum) * 100).toFixed(0)}%`;
 
   const handleCopy = () => {
-    if (!result) return;
-    const text = `Harga Acuan: ${formatRupiah(result.hargaAcuan)}\nPersentase: ${(result.persentase * 100).toFixed(0)}%\nHarga ARA: ${formatRupiah(result.hargaARA)}\nHarga ARB: ${formatRupiah(result.hargaARB)}\n\nSimulasi ARA 10 Hari:\n${result.simulasiARA.map((v, i) => `Hari ${i + 1}: ${formatRupiah(v)}`).join('\n')}\n\nSimulasi ARB 10 Hari:\n${result.simulasiARB.map((v, i) => `Hari ${i + 1}: ${formatRupiah(v)}`).join('\n')}`;
-    navigator.clipboard.writeText(text);
-    addToast('Berhasil disalin ke clipboard!');
+    const t = `Harga Acuan: ${formatRupiah(hNum)} | Jenis: ${jenis === 'fca' ? 'FCA' : 'Reguler'} | Lot: ${lot}\nARA:\n${araResult.map((r) => `H${r.hari}: ${formatRupiah(r.harga)} | Portofolio: ${formatRupiah(r.nilaiPortofolio)}`).join('\n')}\nARB:\n${arbResult.map((r) => `H${r.hari}: ${formatRupiah(r.harga)} | Portofolio: ${formatRupiah(r.nilaiPortofolio)}`).join('\n')}`;
+    navigator.clipboard.writeText(t); addToast('Disalin!');
   };
+  const handlePdf = () => { if (!araResult.length) return; exportARAARBPdf(hNum, araResult[0].harga, arbResult[0].harga, araResult[0].persen, araResult.map((r) => r.harga), arbResult.map((r) => r.harga)); addToast('PDF berhasil!'); };
+  const handleExcel = () => { if (!araResult.length) return; exportARAARBExcel(hNum, araResult[0].harga, arbResult[0].harga, araResult[0].persen, araResult.map((r) => r.harga), arbResult.map((r) => r.harga)); addToast('Excel berhasil!'); };
 
-  const handlePdf = () => {
-    if (!result) return;
-    exportARAARBPdf(result.hargaAcuan, result.hargaARA, result.hargaARB, result.persentase, result.simulasiARA, result.simulasiARB);
-    addToast('Berhasil export ke PDF!');
-  };
-
-  const handleExcel = () => {
-    if (!result) return;
-    exportARAARBExcel(result.hargaAcuan, result.hargaARA, result.hargaARB, result.persentase, result.simulasiARA, result.simulasiARB);
-    addToast('Berhasil export ke Excel!');
-  };
-
-  const araChartData = result?.simulasiARA.map((v, i) => ({ hari: `H${i + 1}`, harga: v })) || [];
-  const arbChartData = result?.simulasiARB.map((v, i) => ({ hari: `H${i + 1}`, harga: v })) || [];
-
-  const getTierLabel = (h: number) => {
-    if (h < 200) return '< Rp200 → ±35%';
-    if (h <= 5000) return 'Rp200 - Rp5.000 → ±25%';
-    return '> Rp5.000 → ±20%';
-  };
+  const araChart = araResult.map((r) => ({ h: `H${r.hari}`, harga: r.harga, porto: r.nilaiPortofolio }));
+  const arbChart = arbResult.map((r) => ({ h: `H${r.hari}`, harga: r.harga, porto: r.nilaiPortofolio }));
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Kalkulator ARA & ARB</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Menghitung batas Auto Rejection berdasarkan aturan BEI
-        </p>
-      </div>
+    <div className="max-w-5xl mx-auto space-y-4 pb-6 anim-fade-up">
+      <div><h1 className="text-xl font-extrabold text-slate-900 dark:text-white">Kalkulator ARA & ARB</h1><p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Fraksi harga diterapkan setiap hari. Reguler & FCA terpisah.</p></div>
 
       <Card>
-        <div className="max-w-sm">
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Harga Acuan (Rp)</label>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={harga}
-            onChange={(e) => setHarga(e.target.value)}
-            placeholder="Contoh: 150"
-            className="w-full px-3.5 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
-          />
+        <div className="space-y-3">
+          <div><label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Pilih IPO (opsional)</label><IpoSelect value={selectedIpo?.id || ''} onChange={handleIpoSelect} /></div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div><label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Harga Acuan (Rp)</label><input type="text" inputMode="numeric" value={harga} onChange={(e) => setHarga(e.target.value)} placeholder="150" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" /></div>
+            <div><label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Lot</label><input type="text" inputMode="numeric" value={lot} onChange={(e) => setLot(e.target.value)} placeholder="1" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" /></div>
+            <div><label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Jumlah Hari</label><input type="text" inputMode="numeric" value={hari} onChange={(e) => setHari(e.target.value)} placeholder="10" className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" /></div>
+            <div><label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Jenis Saham</label><select value={jenis} onChange={(e) => setJenis(e.target.value as JenisSaham)} className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"><option value="reguler">Reguler</option><option value="fca">FCA & Akselerasi</option></select></div>
+          </div>
         </div>
-
-        <div className="flex flex-wrap gap-2 mt-5">
-          <button onClick={handleHitung} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl transition-colors">
-            <Calculator className="w-4 h-4" />
-            Hitung
-          </button>
-          <button onClick={handleReset} className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-xl transition-colors">
-            <RotateCcw className="w-4 h-4" />
-            Reset
-          </button>
+        <div className="flex gap-2 mt-5">
+          <button onClick={handleHitung} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-lg shadow-emerald-500/20"><Calculator className="w-4 h-4" />Hitung</button>
+          <button onClick={() => { setHarga(''); setLot('1'); setHari('10'); setAraResult([]); setArbResult([]); setSelectedIpo(null); }} className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-sm font-medium rounded-xl transition-colors"><RotateCcw className="w-4 h-4" />Reset</button>
         </div>
       </Card>
 
-      {result && (
+      {araResult.length > 0 && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4 animate-fade-in">
-            <Card className="border-l-4 border-l-gray-400">
-              <p className="text-xs text-gray-500 dark:text-gray-400">Harga Acuan</p>
-              <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">{formatRupiah(result.hargaAcuan)}</p>
-              <p className="text-[10px] text-gray-400 mt-1">{getTierLabel(result.hargaAcuan)}</p>
-            </Card>
-            <Card className="border-l-4 border-l-emerald-500">
-              <div className="flex items-center gap-2">
-                <ArrowUpCircle className="w-5 h-5 text-emerald-500" />
-                <p className="text-xs text-gray-500 dark:text-gray-400">Harga ARA</p>
-              </div>
-              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{formatRupiah(result.hargaARA)}</p>
-              <p className="text-[10px] text-emerald-500/70 mt-1">+{(result.persentase * 100).toFixed(0)}%</p>
-            </Card>
-            <Card className="border-l-4 border-l-red-500">
-              <div className="flex items-center gap-2">
-                <ArrowDownCircle className="w-5 h-5 text-red-500" />
-                <p className="text-xs text-gray-500 dark:text-gray-400">Harga ARB</p>
-              </div>
-              <p className="text-xl font-bold text-red-600 dark:text-red-400 mt-1">{formatRupiah(result.hargaARB)}</p>
-              <p className="text-[10px] text-red-500/70 mt-1">-{(result.persentase * 100).toFixed(0)}%</p>
-            </Card>
+          <div className="grid grid-cols-3 gap-2.5 anim-fade-up">
+            <Card className="text-center"><p className="text-[10px] text-slate-400 font-medium">Harga Acuan</p><p className="text-lg font-extrabold text-slate-900 dark:text-white">{formatRupiah(hNum)}</p><p className="text-[9px] text-slate-400">{jenis === 'fca' ? 'FCA' : 'Reguler'}</p></Card>
+            <Card className="text-center border-l-4 border-l-emerald-500"><p className="text-[10px] text-slate-400 font-medium">ARA Hari 1</p><p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">{formatRupiah(araResult[0].harga)}</p><p className="text-[9px] text-emerald-500/70">+{persenAra}</p></Card>
+            <Card className="text-center border-l-4 border-l-red-500"><p className="text-[10px] text-slate-400 font-medium">ARB Hari 1</p><p className="text-lg font-extrabold text-red-600 dark:text-red-400">{formatRupiah(arbResult[0].harga)}</p><p className="text-[9px] text-red-500/70">-{persenArb}</p></Card>
           </div>
 
-          <Card className="animate-fade-in">
+          <Card className="anim-fade-up">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Simulasi 10 Hari & Grafik</h2>
-              <div className="flex gap-1.5">
-                <button onClick={handleCopy} title="Copy" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors">
-                  <Copy className="w-4 h-4" />
-                </button>
-                <button onClick={handlePdf} title="PDF" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors">
-                  <FileDown className="w-4 h-4" />
-                </button>
-                <button onClick={handleExcel} title="Excel" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors">
-                  <FileSpreadsheet className="w-4 h-4" />
-                </button>
-              </div>
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">Simulasi & Grafik</h2>
+              <div className="flex gap-1">{[handleCopy, handlePdf, handleExcel].map((fn, i) => <button key={i} onClick={fn} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors">{[Copy, FileDown, FileSpreadsheet][i] && <>{[Copy, FileDown, FileSpreadsheet].map((Icon, j) => j === i && <Icon key={j} className="w-4 h-4" />)}</>}</button>)}</div>
             </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <TrendingUp className="w-4 h-4 text-emerald-500" />
-                  <h3 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Simulasi ARA</h3>
-                </div>
-                <div className="h-52 mb-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={araChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                      <XAxis dataKey="hari" tick={{ fontSize: 10, fill: '#9ca3af' }} />
-                      <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={fmtAxis as any} />
-                      <Tooltip formatter={fmtTip as any} contentStyle={tooltipStyle} />
-                      <ReferenceLine y={result.hargaAcuan} stroke="#6b7280" strokeDasharray="3 3" />
-                      <Line type="monotone" dataKey="harga" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <th className="text-left py-2 px-2 text-gray-500 font-semibold">Hari</th>
-                        <th className="text-right py-2 px-2 text-gray-500 font-semibold">Harga ARA</th>
-                        <th className="text-right py-2 px-2 text-gray-500 font-semibold">Naik dari Acuan</th>
+              {[
+                { title: 'Simulasi ARA', data: araResult, chart: araChart, color: 'emerald', Icon: TrendingUp },
+                { title: 'Simulasi ARB', data: arbResult, chart: arbChart, color: 'red', Icon: TrendingDown },
+              ].map(({ title, data, chart, color, Icon }) => (
+                <div key={title}>
+                  <div className="flex items-center gap-2 mb-2"><Icon className={clsx('w-4 h-4', color === 'emerald' ? 'text-emerald-500' : 'text-red-500')} /><h3 className={clsx('text-xs font-bold uppercase tracking-wider', color === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{title}</h3></div>
+                  <div className="h-48 mb-3"><ResponsiveContainer width="100%" height="100%"><LineChart data={chart}><CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} /><XAxis dataKey="h" tick={{ fontSize: 9, fill: '#94a3b8' }} /><YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} tickFormatter={fmtAxis as any} /><Tooltip formatter={fmtTip as any} contentStyle={tipStyle} /><ReferenceLine y={hNum} stroke="#475569" strokeDasharray="3 3" /><Line type="monotone" dataKey="harga" stroke={color === 'emerald' ? '#10b981' : '#ef4444'} strokeWidth={2} dot={{ r: 2.5 }} /></LineChart></ResponsiveContainer></div>
+                  <div className="overflow-x-auto"><table className="w-full text-[11px]">
+                    <thead><tr className="border-b border-slate-200 dark:border-slate-700"><th className="text-left py-1.5 px-1.5 text-slate-400 font-semibold">Hari</th><th className="text-right py-1.5 px-1.5 text-slate-400 font-semibold">Harga</th><th className="text-right py-1.5 px-1.5 text-slate-400 font-semibold">%</th><th className="text-right py-1.5 px-1.5 text-slate-400 font-semibold">Portofolio</th></tr></thead>
+                    <tbody>{data.map((r) => (
+                      <tr key={r.hari} className={clsx(r.hari % 2 === 0 ? 'bg-slate-50/50 dark:bg-slate-800/30' : '')}>
+                        <td className="py-1.5 px-1.5 text-slate-600 dark:text-slate-400">H{r.hari}</td>
+                        <td className={clsx('py-1.5 px-1.5 text-right font-semibold', color === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{formatRupiah(r.harga)}</td>
+                        <td className="py-1.5 px-1.5 text-right text-slate-400">{(r.persen * 100).toFixed(0)}%</td>
+                        <td className="py-1.5 px-1.5 text-right font-medium text-slate-700 dark:text-slate-300">{formatRupiah(r.nilaiPortofolio)}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {result.simulasiARA.map((v, i) => (
-                        <tr key={i} className={i % 2 === 0 ? 'bg-emerald-50/30 dark:bg-emerald-500/5' : ''}>
-                          <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">Hari {i + 1}</td>
-                          <td className="py-1.5 px-2 text-right font-medium text-emerald-600 dark:text-emerald-400">{formatRupiah(v)}</td>
-                          <td className="py-1.5 px-2 text-right text-emerald-500/70">+{formatDecimal(((v - result.hargaAcuan) / result.hargaAcuan) * 100, 1)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                    ))}</tbody>
+                  </table></div>
                 </div>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <TrendingDown className="w-4 h-4 text-red-500" />
-                  <h3 className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wider">Simulasi ARB</h3>
-                </div>
-                <div className="h-52 mb-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={arbChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                      <XAxis dataKey="hari" tick={{ fontSize: 10, fill: '#9ca3af' }} />
-                      <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={fmtAxis as any} />
-                      <Tooltip formatter={fmtTip as any} contentStyle={tooltipStyle} />
-                      <ReferenceLine y={result.hargaAcuan} stroke="#6b7280" strokeDasharray="3 3" />
-                      <Line type="monotone" dataKey="harga" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 3, fill: '#ef4444' }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <th className="text-left py-2 px-2 text-gray-500 font-semibold">Hari</th>
-                        <th className="text-right py-2 px-2 text-gray-500 font-semibold">Harga ARB</th>
-                        <th className="text-right py-2 px-2 text-gray-500 font-semibold">Turun dari Acuan</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.simulasiARB.map((v, i) => (
-                        <tr key={i} className={i % 2 === 0 ? 'bg-red-50/30 dark:bg-red-500/5' : ''}>
-                          <td className="py-1.5 px-2 text-gray-700 dark:text-gray-300">Hari {i + 1}</td>
-                          <td className="py-1.5 px-2 text-right font-medium text-red-600 dark:text-red-400">{formatRupiah(v)}</td>
-                          <td className="py-1.5 px-2 text-right text-red-500/70">{formatDecimal(((v - result.hargaAcuan) / result.hargaAcuan) * 100, 1)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              ))}
             </div>
           </Card>
         </>
