@@ -16,8 +16,8 @@ export default function Navbar() {
             <TrendingUp className="w-4 h-4 text-white" />
           </div>
           <div className="leading-tight">
-            <h1 className="text-sm font-bold text-slate-900 dark:text-white">IPO Tools</h1>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Indonesia</p>
+          <h1 className="text-sm font-bold text-slate-900 dark:text-white">IPO Tools</h1>
+          <p className="text-[10px] text-emerald-500 dark:text-emerald-400 font-medium">by AryDims</p>
           </div>
         </div>
         <button onClick={handleToggle} className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">

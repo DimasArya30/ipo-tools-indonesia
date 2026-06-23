@@ -32,9 +32,10 @@ export default function Home() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
         <div className="absolute bottom-0 left-0 w-40 h-40 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/4" />
         <div className="relative">
-          <p className="text-emerald-100 text-sm font-medium mb-1">Selamat Datang di</p>
-          <h1 className="text-2xl md:text-3xl font-extrabold mb-2">IPO Tools Indonesia</h1>
-          <p className="text-emerald-100/80 text-sm max-w-md">Platform kalkulator IPO terlengkap untuk investor Indonesia. Hitung penjatahan, simulasi ARA/ARB, dan kelola modal multi akun.</p>
+        <p className="text-emerald-100 text-sm font-medium mb-1">Selamat Datang di</p>
+        <h1 className="text-2xl md:text-3xl font-extrabold mb-1">IPO Tools</h1>
+        <p className="text-emerald-200/70 text-sm font-medium mb-2">by AryDims</p>
+        <p className="text-emerald-100/80 text-sm max-w-md">All-in-One IPO Calculator for Indonesian Investors</p>
           <Link to="/ipo-center" className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur rounded-xl text-sm font-semibold transition-colors">
             <CalendarDays className="w-4 h-4" />
             Lihat IPO Center
