@@ -1,32 +1,10 @@
-import { applyFraksi } from './fraksiHarga';
-import type { SimulasiHariResult } from '../types';
+import { simulasi } from './araArbEngine';
+import type { SimulasiOutput } from './araArbEngine';
 
-function getAraPersenFca(hari: number): number {
-  return hari === 1 ? 0.35 : 0.25;
+export function getAraFca(harga: number, lot: number, hari: number, ipoDay: boolean): SimulasiOutput {
+  return simulasi(harga, lot, hari, 'fca', 'ara', ipoDay);
 }
 
-function getArbPersenFca(hari: number): number {
-  return hari === 1 ? 0.35 : 0.25;
-}
-
-export function simulasiARAFca(hargaAcuan: number, lot: number, totalHari: number): SimulasiHariResult[] {
-  const results: SimulasiHariResult[] = [];
-  let harga = hargaAcuan;
-  for (let i = 1; i <= totalHari; i++) {
-    const persen = getAraPersenFca(i);
-    harga = applyFraksi(harga * (1 + persen));
-    results.push({ hari: i, harga, persen, nilaiPortofolio: harga * lot * 100 });
-  }
-  return results;
-}
-
-export function simulasiARBFca(hargaAcuan: number, lot: number, totalHari: number): SimulasiHariResult[] {
-  const results: SimulasiHariResult[] = [];
-  let harga = hargaAcuan;
-  for (let i = 1; i <= totalHari; i++) {
-    const persen = getArbPersenFca(i);
-    harga = applyFraksi(harga * (1 - persen));
-    results.push({ hari: i, harga, persen, nilaiPortofolio: harga * lot * 100 });
-  }
-  return results;
+export function getArbFca(harga: number, lot: number, hari: number, ipoDay: boolean): SimulasiOutput {
+  return simulasi(harga, lot, hari, 'fca', 'arb', ipoDay);
 }
