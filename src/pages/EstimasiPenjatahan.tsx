@@ -9,8 +9,8 @@ import { exportPenjatahanExcel } from '../utils/exportExcel';
 import { addHistory } from '../services/storage';
 import { useToast } from '../context/ToastContext';
 import type { PenjatahanInput, PenjatahanResult, IpoData } from '../types';
+import { getIPOByTicker } from '../services/ipoService';
 import { Calculator, FileDown, FileSpreadsheet, Copy, RotateCcw } from 'lucide-react';
-import { fetchIpoById } from '../services/ipoService';
 
 const initial: PenjatahanInput = { ticker: '', totalDana: 0, hargaIPO: 0, oversubscribeLot: 0, antrianInvestor: 0 };
 
@@ -23,13 +23,33 @@ export default function EstimasiPenjatahan() {
 
   useEffect(() => {
     const ipoId = searchParams.get('ipo');
-    if (ipoId) { fetchIpoById(ipoId).then((d) => { if (d) { setSelectedIpo(d); setInput((p) => ({ ...p, ticker: d.ticker, totalDana: d.fundraising, hargaIPO: d.ipoPrice })); } }); }
+    if (ipoId) {
+      getIPOByTicker(ipoId).then((d) => {
+        if (d) {
+          setSelectedIpo(d);
+          setInput((p) => ({
+            ...p,
+            ticker: d.tickerCode,
+            totalDana: d.finalPrice * d.sharesOffered,
+            hargaIPO: d.finalPrice,
+          }));
+        }
+      });
+    }
   }, [searchParams]);
 
   const handleIpoSelect = (ipo: IpoData | null) => {
     setSelectedIpo(ipo);
-    if (ipo) { setInput((p) => ({ ...p, ticker: ipo.ticker, totalDana: ipo.fundraising, hargaIPO: ipo.ipoPrice })); }
-    else { setInput((p) => ({ ...p, ticker: '', totalDana: 0, hargaIPO: 0 })); }
+    if (ipo) {
+      setInput((p) => ({
+        ...p,
+        ticker: ipo.tickerCode,
+        totalDana: ipo.finalPrice * ipo.sharesOffered,
+        hargaIPO: ipo.finalPrice,
+      }));
+    } else {
+      setInput((p) => ({ ...p, ticker: '', totalDana: 0, hargaIPO: 0 }));
+    }
     setResult(null);
   };
 
@@ -74,7 +94,7 @@ export default function EstimasiPenjatahan() {
 
       <Card>
         <div className="space-y-3">
-          <div><label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Pilih IPO</label><IpoSelect value={selectedIpo?.id || ''} onChange={handleIpoSelect} /></div>
+          <div><label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Pilih IPO</label><IpoSelect value={selectedIpo?.tickerCode || ''} onChange={handleIpoSelect} /></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Inp label="Ticker Saham" value={input.ticker} onChange={(v) => setNum('ticker', v)} placeholder="PRDI" />
             <Inp label="Total Dana Dihimpun (Rp)" value={input.totalDana > 0 ? input.totalDana.toLocaleString('id-ID') : ''} onChange={(v) => setNum('totalDana', v)} placeholder="5000000000" />
@@ -94,9 +114,9 @@ export default function EstimasiPenjatahan() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">Hasil — {input.ticker}</h2>
             <div className="flex gap-1">
-              {[handleCopy, handlePdf, handleExcel].map((fn, i) => (
-                <button key={i} onClick={fn} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors">{[Copy, FileDown, FileSpreadsheet][i] && <>{[Copy, FileDown, FileSpreadsheet].map((Icon, j) => j === i && <Icon key={j} className="w-4 h-4" />)}</>}</button>
-              ))}
+              <button onClick={handleCopy} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"><Copy className="w-4 h-4" /></button>
+              <button onClick={handlePdf} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"><FileDown className="w-4 h-4" /></button>
+              <button onClick={handleExcel} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"><FileSpreadsheet className="w-4 h-4" /></button>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

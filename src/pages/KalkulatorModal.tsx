@@ -9,8 +9,8 @@ import { exportModalExcel, importModalExcel } from '../utils/exportExcel';
 import { addHistory } from '../services/storage';
 import { useToast } from '../context/ToastContext';
 import type { SahamInput, SahamResult, IpoData } from '../types';
+import { getIPOByTicker } from '../services/ipoService';
 import { Calculator, Plus, Trash2, FileDown, FileSpreadsheet, FileUp, Copy, RotateCcw, Wallet } from 'lucide-react';
-import { fetchIpoById } from '../services/ipoService';
 
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
@@ -30,10 +30,10 @@ export default function KalkulatorModal() {
   useEffect(() => {
     const ipoId = searchParams.get('ipo');
     if (ipoId) {
-      fetchIpoById(ipoId).then((d) => {
+      getIPOByTicker(ipoId).then((d) => {
         if (d) {
           setSelectedIpo(d);
-          setItems([{ id: genId(), nama: d.ticker, hargaIPO: d.ipoPrice, lotPerAkun: 0, jumlahAkun: 0 }]);
+          setItems([{ id: genId(), nama: d.tickerCode, hargaIPO: d.finalPrice, lotPerAkun: 0, jumlahAkun: 0 }]);
         }
       });
     }
@@ -42,7 +42,7 @@ export default function KalkulatorModal() {
   const handleIpoSelect = (ipo: IpoData | null) => {
     setSelectedIpo(ipo);
     if (ipo) {
-      setItems([{ id: genId(), nama: ipo.ticker, hargaIPO: ipo.ipoPrice, lotPerAkun: 0, jumlahAkun: 0 }]);
+      setItems([{ id: genId(), nama: ipo.tickerCode, hargaIPO: ipo.finalPrice, lotPerAkun: 0, jumlahAkun: 0 }]);
     } else {
       setItems([emptyItem()]);
     }

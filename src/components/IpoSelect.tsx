@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
-import { fetchIpos } from '../services/ipoService';
+import { getAllIPO } from '../services/ipoService';
 import type { IpoData } from '../types';
 
 export default function IpoSelect({ value, onChange, placeholder = 'Pilih IPO...' }: { value: string; onChange: (ipo: IpoData | null) => void; placeholder?: string }) {
@@ -8,23 +8,12 @@ export default function IpoSelect({ value, onChange, placeholder = 'Pilih IPO...
   const [ipos, setIpos] = useState<IpoData[]>([]);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
-  const selected = ipos.find((i) => i.id === value);
+  const selected = ipos.find((i) => i.tickerCode === value);
 
-  useEffect(() => {
-    fetchIpos().then(setIpos);
-  }, []);
+  useEffect(() => { getAllIPO().then(setIpos); }, []);
+  useEffect(() => { const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const filtered = ipos.filter((i) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return i.ticker.toLowerCase().includes(q) || i.companyName.toLowerCase().includes(q);
-  });
+  const filtered = ipos.filter((i) => { if (!search) return true; const q = search.toLowerCase(); return i.tickerCode.toLowerCase().includes(q) || i.companyName.toLowerCase().includes(q); });
 
   const handleSelect = (ipo: IpoData) => { onChange(ipo); setOpen(false); setSearch(''); };
   const handleClear = () => { onChange(null); setOpen(false); };
@@ -32,11 +21,7 @@ export default function IpoSelect({ value, onChange, placeholder = 'Pilih IPO...
   return (
     <div ref={ref} className="relative">
       <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-left focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors">
-        {selected ? (
-          <span className="font-medium text-slate-900 dark:text-white">{selected.ticker} — {selected.companyName}</span>
-        ) : (
-          <span className="text-slate-400 dark:text-slate-500">{placeholder}</span>
-        )}
+        {selected ? <span className="font-medium text-slate-900 dark:text-white">{selected.tickerCode} — {selected.companyName}</span> : <span className="text-slate-400 dark:text-slate-500">{placeholder}</span>}
         <div className="flex items-center gap-1">
           {selected && <button type="button" onClick={(e) => { e.stopPropagation(); handleClear(); }} className="text-slate-400 hover:text-red-500 text-xs mr-1">✕</button>}
           <ChevronDown className="w-4 h-4 text-slate-400" />
@@ -51,18 +36,14 @@ export default function IpoSelect({ value, onChange, placeholder = 'Pilih IPO...
             </div>
           </div>
           <div className="max-h-48 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <p className="p-3 text-xs text-slate-400 text-center">Tidak ditemukan</p>
-            ) : (
-              filtered.map((ipo) => (
-                <button key={ipo.id} type="button" onClick={() => handleSelect(ipo)} className={`w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${ipo.id === value ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                  <span className="font-semibold">{ipo.ticker}</span>
-                  <span className="text-slate-400 dark:text-slate-500 mx-1.5">—</span>
-                  <span className="text-xs">{ipo.companyName}</span>
-                  <span className="float-right text-xs text-slate-400">{new Date(ipo.listingDate).getFullYear()}</span>
-                </button>
-              ))
-            )}
+            {filtered.length === 0 ? <p className="p-3 text-xs text-slate-400 text-center">Tidak ditemukan</p> : filtered.map((ipo) => (
+              <button key={ipo._row} type="button" onClick={() => handleSelect(ipo)} className={`w-full text-left px-3 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${ipo.tickerCode === value ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                <span className="font-semibold">{ipo.tickerCode}</span>
+                <span className="text-slate-400 dark:text-slate-500 mx-1.5">—</span>
+                <span className="text-xs truncate">{ipo.companyName}</span>
+                {ipo.finalPrice > 0 && <span className="float-right text-xs text-slate-400">Rp{ipo.finalPrice.toLocaleString('id-ID')}</span>}
+              </button>
+            ))}
           </div>
         </div>
       )}

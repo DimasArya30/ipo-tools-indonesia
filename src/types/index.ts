@@ -1,5 +1,4 @@
-// Re-export IPO types
-export type { IpoData, IpoFilter } from './ipo';
+export type { IpoData, IpoFilter, IpoStatusFilter } from './ipo';
 
 export interface PenjatahanInput {
   ticker: string;
@@ -24,8 +23,10 @@ export interface PenjatahanResult {
 
 export interface SimulasiHariResult {
   hari: number;
+  hargaSebelumnya: number;
   harga: number;
-  persen: number;
+  perubahanHarian: number;
+  perubahanTotal: number;
   nilaiPortofolio: number;
 }
 

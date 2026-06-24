@@ -8,7 +8,7 @@ import { formatRupiah, formatDecimal, formatNumber } from '../utils/format';
 import { addHistory } from '../services/storage';
 import { useToast } from '../context/ToastContext';
 import type { JenisSaham, IpoData } from '../types';
-import { fetchIpoById } from '../services/ipoService';
+import { getIPOByTicker } from '../services/ipoService';
 import { Calculator, RotateCcw, ArrowUpRight, ArrowDownRight, Minus, Info } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -25,10 +25,20 @@ export default function KalkulatorProfit() {
 
   useEffect(() => {
     const ipoId = searchParams.get('ipo');
-    if (ipoId) fetchIpoById(ipoId).then((d) => { if (d) { setSelectedIpo(d); setHargaBeli(d.ipoPrice.toString()); } });
+    if (ipoId) {
+      getIPOByTicker(ipoId).then((d) => {
+        if (d) {
+          setSelectedIpo(d);
+          setHargaBeli(d.finalPrice.toString());
+        }
+      });
+    }
   }, [searchParams]);
 
-  const handleIpoSelect = (ipo: IpoData | null) => { setSelectedIpo(ipo); setHargaBeli(ipo ? ipo.ipoPrice.toString() : ''); };
+  const handleIpoSelect = (ipo: IpoData | null) => {
+    setSelectedIpo(ipo);
+    setHargaBeli(ipo ? ipo.finalPrice.toString() : '');
+  };
 
   const handleHitung = () => {
     const b = Number(hargaBeli.replace(/\./g, ''));
@@ -51,7 +61,7 @@ export default function KalkulatorProfit() {
 
       <Card>
         <div className="space-y-3">
-          <div><label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Pilih IPO (opsional)</label><IpoSelect value={selectedIpo?.id || ''} onChange={handleIpoSelect} /></div>
+          <div><label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Pilih IPO (opsional)</label><IpoSelect value={selectedIpo?.tickerCode || ''} onChange={handleIpoSelect} /></div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Inp label="Harga Beli (Rp)" value={hargaBeli} onChange={setHargaBeli} placeholder="150" />
             <Inp label="Lot" value={lot} onChange={setLot} placeholder="1" />
