@@ -12,6 +12,9 @@ import KalkulatorARAARB from './pages/KalkulatorARAARB';
 import KalkulatorModal from './pages/KalkulatorModal';
 import KalkulatorProfit from './pages/KalkulatorProfit';
 import { TrendingUp } from 'lucide-react';
+import AIIPOScore from './pages/AIIPOScore';
+import NewsCenter from './pages/NewsCenter';
+import DividendCalculator from './pages/DividendCalculator';
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
   const [fade, setFade] = useState(false);
@@ -82,6 +85,9 @@ function AppContent() {
               <Route path="/kalkulator/ara-arb" element={<KalkulatorARAARB />} />
               <Route path="/kalkulator/modal" element={<KalkulatorModal />} />
               <Route path="/kalkulator/profit" element={<KalkulatorProfit />} />
+              <Route path="/ai-ipo-score" element={<AIIPOScore />} />
+              <Route path="/news-center" element={<NewsCenter />} />
+              <Route path="/dividend-calculator" element={<DividendCalculator />} />
             </Routes>
           </main>
           <BottomNav />
