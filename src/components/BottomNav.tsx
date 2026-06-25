@@ -1,11 +1,14 @@
 import { NavLink } from 'react-router-dom';
-import { Home, CalendarDays, Calculator, TrendingUp } from 'lucide-react';
+import { Home, CalendarDays, Calculator, TrendingUp, Brain, Newspaper, Calculator as DivCalc } from 'lucide-react';
 import clsx from 'clsx';
 
 const items = [
   { to: '/', icon: Home, label: 'Home' },
-  { to: '/ipo-center', icon: CalendarDays, label: 'IPO Center' },
+  { to: '/ipo-center', icon: CalendarDays, label: 'IPO' },
+  { to: '/ai-ipo-score', icon: Brain, label: 'AI Score' },
+  { to: '/news-center', icon: Newspaper, label: 'News' },
   { to: '/kalkulator', icon: Calculator, label: 'Kalkulator' },
+  { to: '/dividend-calculator', icon: DivCalc, label: 'Dividen' },
   { to: '/kalkulator/ara-arb', icon: TrendingUp, label: 'ARA/ARB' },
 ];
 
@@ -15,7 +18,7 @@ export default function BottomNav() {
       <div className="max-w-5xl mx-auto flex items-center justify-around h-16">
         {items.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.to === '/'}
-            className={({ isActive }) => clsx('flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-colors', isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500')}
+            className={({ isActive }) => clsx('flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-colors', isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500')}
           >
             <item.icon className="w-5 h-5" />
             <span className="text-[10px] font-medium">{item.label}</span>
