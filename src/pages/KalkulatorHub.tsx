@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
 import Card from '../components/Card';
-import { Calculator, TrendingUp, Wallet, BarChart3, ArrowRight } from 'lucide-react';
+import { Calculator, TrendingUp, Wallet, BarChart3, Coins, ArrowRight } from 'lucide-react';
 
 const items = [
   { to: '/kalkulator/penjatahan', icon: Calculator, title: 'Estimasi Penjatahan IPO', desc: 'Estimasi jumlah lot yang diperoleh saat IPO berdasarkan dana dihimpun, oversubscribe, dan antrian investor.', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
   { to: '/kalkulator/ara-arb', icon: TrendingUp, title: 'Kalkulator ARA & ARB', desc: 'Simulasi batas Auto Rejection Atas dan Bawah harian dengan fraksi harga BEI, untuk saham Reguler dan FCA.', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+  { to: '/dividend-calculator', icon: Coins, title: 'Dividend Calculator', desc: 'Hitung dividen kotor, bersih, pajak, yield, yield on cost, dan proyeksi reinvestasi dividen.', color: 'text-pink-600 dark:text-pink-400', bg: 'bg-pink-50 dark:bg-pink-500/10' },
   { to: '/kalkulator/modal', icon: Wallet, title: 'Kalkulator Modal Multi Akun', desc: 'Hitung kebutuhan modal IPO untuk banyak akun sekaligus. Tambah saham sebanyak yang diinginkan.', color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-500/10' },
   { to: '/kalkulator/profit', icon: BarChart3, title: 'Kalkulator Profit IPO', desc: 'Estimasi keuntungan dari investasi IPO berdasarkan harga beli dan harga jual target.', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10' },
 ];
