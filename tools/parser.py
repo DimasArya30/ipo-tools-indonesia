@@ -19,7 +19,7 @@ STATUS_CLASS_MAP = {
 }
 
 # ============================================================
-# LABEL WEBSITE → KOLOM CSV (HARUS PERSIS SAMA DENGAN CSV)
+# LABEL WEBSITE → KOLOM CSV (HARUS PERSIS)
 # ============================================================
 LABEL_MAP = {
     "kode emiten": "Ticker Code",
@@ -33,19 +33,29 @@ LABEL_MAP = {
     "harga penawaran": "Final Price (Rp)",
     "harga": "Final Price (Rp)",
     "jumlah lembar saham yang ditawarkan": "Number of shares offered",
-    "jumlah lembar saham": "Number of shares offered",
+    "jumlah saham ditawarkan": "Number of shares offered",
+    "saham ditawarkan": "Number of shares offered",
     "lembar saham": "Number of shares offered",
     "persentase jumlah saham yang ditawarkan": "% of Total Shares",
     "persentase penawaran": "% of Total Shares",
+    "% dari total saham dicatatkan": "% of Total Shares",
+    "persentase dari total saham": "% of Total Shares",
     "persentase": "% of Total Shares",
     "penjamin emisi efek": "Underwriter(s)",
     "penjamin emisi": "Underwriter(s)",
     "underwriter": "Underwriter(s)",
+    "partisipan admin": "Participant Admin",
     "periode penawaran awal": "Book Building Opening",
     "book building opening": "Book Building Opening",
+    "periode book building": "Book Building Opening",
     "tanggal mulai book building": "Book Building Opening",
     "tanggal selesai book building": "Book Building Closing",
     "book building closing": "Book Building Closing",
+    "rentang harga book building": "Lowest Book Building Price (Rp)",
+    "harga terendah book building": "Lowest Book Building Price (Rp)",
+    "lowest book building price": "Lowest Book Building Price (Rp)",
+    "harga tertinggi book building": "Highest Book Building Price (Rp)",
+    "highest book building price": "Highest Book Building Price (Rp)",
     "tanggal penawaran": "Opening of Offering Period",
     "offering date": "Opening of Offering Period",
     "opening of offering period": "Opening of Offering Period",
@@ -57,19 +67,15 @@ LABEL_MAP = {
     "distribution date": "Distribution Date",
     "tanggal pencatatan": "Listing Date",
     "listing date": "Listing Date",
+    "situs perusahaan emiten": "Website",
+    "situs perusahaan": "Website",
     "website": "Website",
     "bidang usaha": "Line of Business",
     "line of business": "Line of Business",
     "alamat": "Address",
     "address": "Address",
-    "partisipan admin": "Participant Admin",
-    "participant admin": "Participant Admin",
-    "harga terendah book building": "Lowest Book Building Price (Rp)",
-    "lowest book building price": "Lowest Book Building Price (Rp)",
-    "harga tertinggi book building": "Highest Book Building Price (Rp)",
-    "highest book building price": "Highest Book Building Price (Rp)",
     "warrant per share ratio": "Warrant per share ratio",
-    "warrant": "Warrant per share ratio",
+    "warrant per saham": "Warrant per share ratio",
     "exercise price": "Exercise Price (Warrant) (Rp)",
     "harga exercise": "Exercise Price (Warrant) (Rp)",
     "return d1": "Return D1",
@@ -203,7 +209,28 @@ def _parse_block(block, csv_columns):
                     if t:
                         parts.append(t)
             val = _clean(" ".join(parts))
+            
             if val:
+                # Pisahkan "23 Jun 2026 - 25 Jun 2026" jadi Opening & Closing
+                if ccol == "Book Building Opening" and " - " in val:
+                    p = val.split(" - ")
+                    if len(p) == 2:
+                        fields["Book Building Opening"] = _clean(p[0])
+                        fields["Book Building Closing"] = _clean(p[1])
+                        continue
+                
+                # Pisahkan "Rp 135 - Rp 170" jadi Lowest & Highest
+                if ccol == "Lowest Book Building Price (Rp)" and " - " in val:
+                    p = val.split(" - ")
+                    if len(p) == 2:
+                        fields["Lowest Book Building Price (Rp)"] = _clean(p[0])
+                        fields["Highest Book Building Price (Rp)"] = _clean(p[1])
+                        continue
+                
+                # Bersihkan kata "Lot"
+                if ccol == "Number of shares offered":
+                    val = re.sub(r"\s*Lot\s*", "", val, flags=re.IGNORECASE)
+
                 fields[ccol] = val
 
     result = {c: "" for c in csv_columns}
@@ -228,18 +255,56 @@ def parse_detail_page(html, csv_columns):
     soup = BeautifulSoup(html, "lxml")
     result = {}
 
-    # Strategi 1: tabel
-    result.update(_from_table(soup, csv_columns))
-    # Strategi 2: dt/dl, th/td, strong
-    result.update(_from_defs(soup, csv_columns))
-    # Strategi 3: regex teks
+    # Strategi 1: Tag <h5> + <p> (struktur asli e-IPO)
+    result.update(_from_h5_p(soup, csv_columns))
+    
+    # Strategi 2: Tabel (fallback kalau suatu hari berubah)
+    if not result:
+        result.update(_from_table(soup, csv_columns))
+        
+    # Strategi 3: Tag defs (fallback)
     if len(result) < 3:
-        result.update(_from_text(html, csv_columns))
+        result.update(_from_defs(soup, csv_columns))
 
     result["_prospektus"] = _find_pdfs(soup)
     if not result.get("Website"):
         result["Website"] = _find_website(soup)
     return result
+
+
+def _from_h5_p(soup, csv_columns):
+    """Parse struktur <h5 class="nomargin">Label</h5><p>Value</p>"""
+    f = {}
+    for h5 in soup.find_all("h5"):
+        label = h5.get_text(strip=True)
+        col = _find_col(label)
+        if not col or col not in csv_columns:
+            continue
+
+        p = h5.find_next_sibling("p")
+        if not p:
+            ns = h5.find_next_sibling()
+            if ns and ns.name != "p":
+                p = ns.find_next("p")
+        if not p:
+            continue
+
+        val = _clean(p.get_text())
+
+        if col == "Website":
+            a = p.find("a", href=True)
+            if a:
+                val = a["href"]
+
+        if col == "Number of shares offered":
+            val = re.sub(r"\s*saham\s*", "", val, flags=re.IGNORECASE)
+
+        if col == "% of Total Shares" and val and not val.endswith("%"):
+            val = val + "%"
+
+        if val:
+            f[col] = val
+    return f
 
 
 def _from_table(soup, csv_columns):
@@ -278,28 +343,12 @@ def _from_defs(soup, csv_columns):
     return f
 
 
-def _from_text(html, csv_columns):
-    f = {}
-    text = re.sub(r"<[^>]+>", " | ", html)
-    text = re.sub(r"\s+", " ", text)
-    for lbl, c in LABEL_MAP.items():
-        if c not in csv_columns:
-            continue
-        pat = re.escape(lbl) + r"\s*[:\|]\s*([^|]{1,200}?)(?=\||$)"
-        m = re.search(pat, text, re.IGNORECASE)
-        if m:
-            v = _clean(m.group(1))
-            if v:
-                f[c] = v
-    return f
-
-
 def _find_pdfs(soup):
     urls = []
     for a in soup.find_all("a", href=True):
         h = a["href"].lower()
         t = a.get_text(strip=True).lower()
-        if h.endswith(".pdf") or "prospektus" in t or "informasi tambahan" in t:
+        if h.endswith(".pdf") or "prospektus" in t or "informasi tambahan" in t or "info lain" in t:
             urls.append(urljoin(BASE_URL, a["href"]))
     return urls
 
