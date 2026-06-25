@@ -78,7 +78,7 @@ function setCache(data: IpoData[]): void {
 }
 
 async function fetchAndParse(): Promise<IpoData[]> {
-  const res = await fetch('/e-IPO Data.csv');
+  const res = await fetch(encodeURI(`/e-IPO Data.csv?t=${Date.now()}`));
   const text = await res.text();
   return new Promise((resolve, reject) => {
     Papa.parse(text, {
