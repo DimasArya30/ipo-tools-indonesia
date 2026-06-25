@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { IPODataInput, IPOScore, IPOAnalysis } from '../types/score';
+import { calculateIPOScore } from '../utils/scoreEngine';
 import { getIPOScoreAndAnalysis } from '../services/scoreService';
 
 export const useIPOScore = (ipo: IPODataInput | null) => {
@@ -11,13 +12,10 @@ export const useIPOScore = (ipo: IPODataInput | null) => {
   useEffect(() => {
     if (!ipo) return;
     setLoading(true);
-    // Formula engine sync
-    const { calculateIPOScore } = require('../utils/scoreEngine');
     const s = calculateIPOScore(ipo);
     setScore(s);
     setLoading(false);
 
-    // AI Async
     setAiLoading(true);
     getIPOScoreAndAnalysis(ipo).then(res => {
       setAnalysis(res.analysis);
